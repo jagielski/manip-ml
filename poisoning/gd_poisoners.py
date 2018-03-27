@@ -69,7 +69,7 @@ class GDPoisoner(object):
                 eta, beta, sigma, eps, \
                 mproc, \
                 trainfile, resfile, \
-                objective, opty):
+                objective, opty, colmap):
         """
         GDPoisoner handles gradient descent and poisoning routines
         Computations for specific models found in respective classes
@@ -90,6 +90,7 @@ class GDPoisoner(object):
 
         objective: which objective to use
         opty: whether to optimize y
+        colmap: map of columns for onehot encoded features
         """
 
         self.trnx = x
@@ -111,7 +112,7 @@ class GDPoisoner(object):
 
         elif (objective == 1): # validation MSE
             self.attack_comp = self.comp_attack_vld
-            self.obj_comp = self.comp_obj_valid
+            self.obj_comp = self.comp_obj_vld
 
         elif (objective == 2): # l2 distance between clean and poisoned
             self.attack_comp = self.comp_attack_l2
@@ -130,6 +131,8 @@ class GDPoisoner(object):
         self.trainfile = trainfile
         self.resfile = resfile
         self.initclf,self.initlam = None,None
+
+        self.colmap = colmap
 
     def poison_data(self,poisx,poisy,tstart,visualize,newlogdir):
         """
@@ -173,7 +176,6 @@ class GDPoisoner(object):
     
         sig = self.compute_sigma() # can already compute sigma and mu
         mu = self.compute_mu()     # as x_c does not change them
-    
         eq7lhs = np.bmat([ [sig, np.transpose(mu)],
                            [mu,  np.matrix([1])] ] )
      
@@ -269,7 +271,7 @@ class GDPoisoner(object):
             if (it_res[0] > best_obj):
                 best_poisx, best_poisy, best_obj = poisx, poisy, it_res[1]
 
-            last_obj = ppm1[1]
+            last_obj = it_res[1]
 
             towrite = [poisct, count, it_res[0], it_res[1]-it_res[0],\
                        it_res[2][0], it_res[2][1], \
@@ -412,7 +414,7 @@ class GDPoisoner(object):
         else:
             otherargs = None
 
-        attack, attacky = self.attackcomp(clf, wxc, bxc, wyc, byc, otherargs)
+        attack, attacky = self.attack_comp(clf, wxc, bxc, wyc, byc, otherargs)
 
         allattack = np.array(np.concatenate((attack, attacky), axis=1))
         allattack = allattack.ravel()
@@ -446,10 +448,10 @@ class GDPoisoner(object):
         else:
             otherargs = None
         
-        attack, attacky = self.attackcomp(clf, wxc, bxc, wyc, byc, otherargs)
+        attack, attacky = self.attack_comp(clf, wxc, bxc, wyc, byc, otherargs)
 
         # keep track of how many points are pushed out of bounds
-        if (poisyelem >= 1 and attacky >= 0)
+        if (poisyelem >= 1 and attacky >= 0)\
             or (poisyelem <= 0 and attacky <= 0):
             outofbounds = True
         else:
@@ -564,13 +566,13 @@ class GDPoisoner(object):
             w_1 = w_2
             k += 1
     
-        for col in colmap:
-            vals = [(curpoisxelem[0,j], j) for j in colmap[col]]
+        for col in self.colmap:
+            vals = [(curpoisxelem[0,j], j) for j in self.colmap[col]]
             topval, topcol = max(vals)
-            for j in colmap[col]:
+            for j in self.colmap[col]:
                 if (j != topcol):
                     curpoisxelem[0,j] = 0
-            if ( topval > 1/(1 + len(colmap[col])) ):
+            if ( topval > 1/(1 + len(self.colmap[col])) ):
                 curpoisxelem[0,topcol]=1
             else:
                 curpoisxelem[0,topcol]=0
@@ -656,7 +658,7 @@ class LinRegGDPoisoner(GDPoisoner):
                 eta, beta, sigma, eps, \
                 mproc, \
                 trainfile, resfile, \
-                objective, opty):
+                objective, opty, colmap):
         """
         LinRegGDPoisoner implements computations for ordinary least
         squares regression. Computations involving regularization are
@@ -668,7 +670,7 @@ class LinRegGDPoisoner(GDPoisoner):
         GDPoisoner.__init__(self, x, y, testx, testy, validx, validy, \
                             eta, beta, sigma, eps, mproc, \
                             trainfile, resfile, \
-                            objective, opty)
+                            objective, opty, colmap)
         self.initclf, self.initlam = self.learn_model(self.x,self.y,None)
 
     def learn_model(self, x, y, clf):
@@ -683,7 +685,7 @@ class LinRegGDPoisoner(GDPoisoner):
         return sigma
 
     def compute_mu(self):
-        mu = np.mean(self.trnx)
+        mu = np.mean(self.trnx, axis=0)
         return mu
 
     def compute_m(self, clf, poisxelem, poisyelem):
@@ -700,7 +702,7 @@ class LinRegGDPoisoner(GDPoisoner):
         eq7rhs = -(1/n)*np.bmat([[m,             -np.matrix(poisxelem.T)],
                                  [np.matrix(w.T), np.matrix([-1])       ]])
     
-        wbxc = np.linalg.lstsq(eq7lhs,eq7rhs)[0]
+        wbxc = np.linalg.lstsq(eq7lhs,eq7rhs,rcond=None)[0]
         wxc = wbxc[:-1,:-1] # get all but last row
         bxc = wbxc[ -1,:-1] # get last row
         wyc = wbxc[:-1, -1]
@@ -719,7 +721,7 @@ class LinRegGDPoisoner(GDPoisoner):
         return mse
 
     def comp_obj_vld(self,clf,lam,otherargs):
-        m = self.validx.shape[0]
+        m = self.vldx.shape[0]
         errs = clf.predict(self.vldx) - self.vldy
         mse = np.linalg.norm(errs)**2 / m
         return mse
@@ -757,13 +759,13 @@ class LassoGDPoisoner(LinRegGDPoisoner):
                 eta, beta, sigma, eps, \
                 mproc, \
                 trainfile, resfile, \
-                objective, opty):
+                objective, opty, colmap):
 
 
         GDPoisoner.__init__(self, x, y, testx, testy, validx, validy, \
                             eta, beta, sigma, eps, mproc, \
                             trainfile, resfile, \
-                            objective, opty)
+                            objective, opty, colmap)
 
         self.initlam = -1    
         self.initclf, self.initlam = self.learn_model(self.trnx, self.trny, None, lam = None)
@@ -793,14 +795,14 @@ class LassoGDPoisoner(LinRegGDPoisoner):
     def learn_model(self, x, y, clf, lam = None):
         if (lam is None and self.initlam != -1): # hack for first training
             lam = self.initlam
-        if clf is not None:
-            if lam is not None:
+        if clf is None:
+            if lam is None:
                 clf = linear_model.LassoCV(max_iter=10000)
                 clf.fit(x, y)
                 lam = clf.alpha_
             clf = linear_model.Lasso(alpha = lam, \
-                                     max_iter = 10000, \
-                                     warm_start = True)
+                                 max_iter = 10000, \
+                                 warm_start = True)
         clf.fit(x, y)
         return clf, lam
 
@@ -814,55 +816,48 @@ class RidgeGDPoisoner(LinRegGDPoisoner):
                 eta, beta, sigma, eps, \
                 mproc, \
                 trainfile, resfile, \
-                objective, opty):
+                objective, opty, colmap):
 
 
         GDPoisoner.__init__(self, x, y, testx, testy, validx, validy, \
                             eta, beta, sigma, eps, mproc, \
                             trainfile, resfile, \
-                            objective, opty)
+                            objective, opty, colmap)
         self.initlam = -1
         self.initclf, self.initlam = self.learn_model(self.trnx, self.trny, \
                                                   None, lam = None)
 
-  def comp_obj_trn(self, clf, lam, otherargs):
-    curweight = LinRegGDPoisoner.comp_obj_trn(self, clf, lam, otherargs)
-    l2_norm = la.norm(clf.coef_) / 2
-    return lam*l2_norm + curweight
+    def comp_obj_trn(self, clf, lam, otherargs):
+        curweight = LinRegGDPoisoner.comp_obj_trn(self, clf, lam, otherargs)
+        l2_norm = la.norm(clf.coef_) / 2
+        return lam*l2_norm + curweight
 
 
-  def comp_attack_trn(self, clf, wxc, bxc, wyc, byc, otherargs):
-    r, = otherargs
-    attackx,attacky = LinRegGDPoisoner.comp_attack_trn(self, clf, \
+    def comp_attack_trn(self, clf, wxc, bxc, wyc, byc, otherargs):
+        r, = otherargs
+        attackx,attacky = LinRegGDPoisoner.comp_attack_trn(self, clf, \
                                             wxc, bxc, wyc, byc, otherargs)
 
-    attackx += np.dot(r, wxc)
-    attacky += np.dot(r, wyc.T)
-    return attackx, attacky
+        attackx += np.dot(r, wxc)
+        attacky += np.dot(r, wyc.T)
+        return attackx, attacky
 
-  def compute_r(self, clf, lam):
-    r = LinRegGDPoisoner.compute_r(self, clf, lam)
-    r += lam * np.matrix(clf.coef_).reshape(1, self.feanum)
-    return r
+    def compute_r(self, clf, lam):
+        r = LinRegGDPoisoner.compute_r(self, clf, lam)
+        r += lam * np.matrix(clf.coef_).reshape(1, self.feanum)
+        return r
 
-  def compute_sigma(self):
-    basesigma = LinRegGDPoisoner.compute_sigma(self)
-    sigma = basesigma + self.initlam * np.eye(self.feanum)
-    return sigma
+    def compute_sigma(self):
+        basesigma = LinRegGDPoisoner.compute_sigma(self)
+        sigma = basesigma + self.initlam * np.eye(self.feanum)
+        return sigma
     
-  def learn_model(self, x, y, clf, lam = None):
-    if (lam is None and self.initlam != -1):
-      lam = self.initlam
-    lam = 0.1
-    if clf is not None:
-      if lam is not None:
-        clf = linear_model.RidgeCV()
+    def learn_model(self, x, y, clf, lam = None):
+        lam = 0.1
+        clf = linear_model.Ridge(alpha = lam, max_iter = 10000)
         clf.fit(x, y)
-        lam = clf.alpha_
-      clf = linear_model.Ridge(alpha = lam, max_iter = 10000)
-    clf.fit(x, y)
-    return clf, lam
-
+        return clf, lam
+ 
 
 ############################################################################################
 # Implements GD Poisoning for Elastic Net Linear Regression
@@ -892,30 +887,30 @@ class ENetGDPoisoner(LinRegGDPoisoner):
 
         return (lam * aux) / 2 + curweight
 
-  def comp_attack_trn(self, clf, wxc, bxc, wyc, byc, otherargs):
-    r, = otherargs
-    attackx, attacky = LinRegGDPoisoner.comp_attack_trn(self, clf, \
+    def comp_attack_trn(self, clf, wxc, bxc, wyc, byc, otherargs):
+        r, = otherargs
+        attackx, attacky = LinRegGDPoisoner.comp_attack_trn(self, clf, \
                                             wxc, bxc, wyc, byc, otherargs)
-    attackx += np.dot(r, wxc)
-    attacky += np.dot(r, wyc.T)
-    return attackx, attacky
+        attackx += np.dot(r, wxc)
+        attacky += np.dot(r, wyc.T)
+        return attackx, attacky
 
-  def compute_r(self, clf, lam):
-    w,b = clf.coef_, clf.intercept_
-    r = LinRegGDPoisoner.compute_r(self, clf, lam)
+    def compute_r(self, clf, lam):
+        w,b = clf.coef_, clf.intercept_
+        r = LinRegGDPoisoner.compute_r(self, clf, lam)
 
-    errs = clf.predict(self.trnx) - self.trny
-    l1_r = np.dot(errs, self.trnx)
-    l1_r = -l1_r / self.samplenum
-    l2_r = np.matrix(clf.coef_).reshape(1, self.feanum)
+        errs = clf.predict(self.trnx) - self.trny
+        l1_r = np.dot(errs, self.trnx)
+        l1_r = -l1_r / self.samplenum
+        l2_r = np.matrix(clf.coef_).reshape(1, self.feanum)
 
-    r += (l1_r + l2_r) * lam / 2
-    return r
+        r += (l1_r + l2_r) * lam / 2
+        return r
 
-  def compute_sigma(self):
-    basesigma = LinRegGDPoisoner.compute_sigma(self)
-    sigma = self.initlam * (np.eye(self.feanum)/2)
-    return sigma
+    def compute_sigma(self):
+        basesigma = LinRegGDPoisoner.compute_sigma(self)
+        sigma = self.initlam * (np.eye(self.feanum)/2)
+        return sigma
 
     def learn_model(self, x, y, clf, lam = None):
         if (lam is None and self.initlam != -1):
