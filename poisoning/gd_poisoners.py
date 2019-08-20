@@ -158,7 +158,7 @@ class GDPoisoner(object):
             poisy_hist = np.zeros((10, poisx.shape[0]))
             
             # store first round
-            poisx_hist[0] = poisxinit[:]
+            poisx_hist[0] = poisx[:]
             poisy_hist[0] = np.array(poisy)
 
         best_poisx = np.zeros( poisx.shape )
@@ -391,9 +391,9 @@ class GDPoisoner(object):
                             np.concatenate((self.trnx, 
                                             grid_x[i,0].reshape((1,1))),
                                             axis=0),
-                            self.trny+[x[i,1]], None)
+                            self.trny+[grid_x[i,1]], None)
             z[i,0], z[i,1] = self.comp_grad_dummy(eq7lhs, mu, clf, lam, \
-                                                  x[i,0].reshape((1,1)), x[i,1])
+                                                  grid_x[i,0].reshape((1,1)), grid_x[i,1])
 
         U = z[:,0]
         V = z[:,1]
