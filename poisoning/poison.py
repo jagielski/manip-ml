@@ -2,6 +2,7 @@
 
 import numpy as np, scipy.optimize
 import numpy.linalg as la
+import numpy as np
 
 # import my modules
 from poisoning.my_args import setup_argparse
@@ -428,12 +429,24 @@ def main(args):
         testfile.write(','.join([str(val) for val in [testy[i]] + testx[i].tolist()[0]]) + '\n')
     testfile.close()
 
+    # save as numpy files
+    np.save(newlogdir + os.path.sep + 'testx', testx)
+    np.save(newlogdir + os.path.sep + 'testy', np.array(testy).reshape(-1, ))
+
     for i in range(len(validy)):
         validfile.write(','.join([str(val) for val in [validy[i]] + validx[i].tolist()[0]]) + '\n')
     validfile.close()
 
+    # save as numpy files
+    np.save(newlogdir + os.path.sep + 'validx', validx)
+    np.save(newlogdir + os.path.sep + 'validy', np.array(validy).reshape(-1, ))
+
     for i in range(len(trainy)):
         trainfile.write(','.join([str(val) for val in [trainy[i]] + trainx[i].tolist()[0]]) + '\n')
+
+    # save as numpy files
+    np.save(newlogdir + os.path.sep + 'trainx', trainx)
+    np.save(newlogdir + os.path.sep + 'trainy', np.array(trainy).reshape(-1, ))
 
     print(la.matrix_rank(trainx))
     print(trainx.shape)
@@ -464,7 +477,7 @@ def main(args):
     genpoiser = types[args.model](trainx, trainy, testx, testy, validx, validy,
                                   args.eta, args.beta, args.sigma, args.epsilon,
                                   args.multiproc,
-                                  trainfile, resfile, args.objective, args.optimizey, colmap)
+                                  trainfile, resfile, args.objective, args.optimizey, colmap, args.lambd)
 
     for initit in range(args.numinit):
         poisx, poisy = init(trainx, trainy, int(args.trainct * totprop / (1 - totprop) + 0.5))
@@ -477,9 +490,10 @@ def main(args):
     poiser = types[args.model](trainx, trainy, testx, testy, validx, validy,
                                args.eta, args.beta, args.sigma, args.epsilon,
                                args.multiproc, trainfile, resfile,
-                               args.objective, args.optimizey, colmap)
+                               args.objective, args.optimizey, colmap, args.lambd)
 
     for i in range(args.partct + 1):
+        i = 4
         curprop = (i + 1) * totprop / (args.partct + 1)
         numsamples = int(0.5 + args.trainct * (curprop / (1 - curprop)))
         curpoisx = poisx[:numsamples, :]
@@ -522,6 +536,12 @@ def main(args):
         trainfile.flush()
         os.fsync(resfile.fileno())
         os.fsync(trainfile.fileno())
+
+        # save as numpy files
+        np.save(newlogdir + os.path.sep + 'poisres_{}'.format(curprop), poisres)
+        np.save(newlogdir + os.path.sep + 'poisresy_{}'.format(curprop), np.array(poisresy).reshape(-1, ))
+
+        break
 
     trainfile.close()
     testfile.close()

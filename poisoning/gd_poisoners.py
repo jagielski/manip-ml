@@ -800,13 +800,13 @@ class RidgeGDPoisoner(LinRegGDPoisoner):
                  eta, beta, sigma, eps,
                  mproc,
                  trainfile, resfile,
-                 objective, opty, colmap):
+                 objective, opty, colmap, lambd):
         GDPoisoner.__init__(self, x, y, testx, testy, validx, validy,
                             eta, beta, sigma, eps, mproc,
                             trainfile, resfile,
                             objective, opty, colmap)
-        self.initlam = -1
-        self.initclf, self.initlam = self.learn_model(self.trnx, self.trny, None, lam=None)
+        self.initlam = lambd
+        self.initclf, self.initlam = self.learn_model(self.trnx, self.trny, None, lam=self.initlam)
 
     def comp_obj_trn(self, clf, lam, otherargs):
         curweight = LinRegGDPoisoner.comp_obj_trn(self, clf, lam, otherargs)
@@ -831,8 +831,7 @@ class RidgeGDPoisoner(LinRegGDPoisoner):
         sigma = basesigma + self.initlam * np.eye(self.feanum)
         return sigma
 
-    def learn_model(self, x, y, clf, lam=None):
-        lam = 0.1
+    def learn_model(self, x, y, clf, lam=0.1):
         clf = linear_model.Ridge(alpha=lam, max_iter=10000)
         clf.fit(x, y)
         return clf, lam

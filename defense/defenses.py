@@ -1,6 +1,6 @@
 import numpy as np
 import sklearn.linear_model as lm
-
+from sklearn.metrics import mean_squared_error
 
 def huberreg(x, y, epss):
     scores = []
