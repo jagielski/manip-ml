@@ -7,6 +7,9 @@ import numpy as np
 # import my modules
 from poisoning.my_args import setup_argparse
 from poisoning.gd_poisoners import *
+# from my_args import setup_argparse
+# from gd_poisoners import *
+
 
 
 # -------------------------------------------------------------------------------
@@ -538,8 +541,8 @@ def main(args):
         os.fsync(trainfile.fileno())
 
         # save as numpy files
-        np.save(newlogdir + os.path.sep + 'poisres_{}'.format(curprop), poisres)
-        np.save(newlogdir + os.path.sep + 'poisresy_{}'.format(curprop), np.array(poisresy).reshape(-1, ))
+        np.save(newlogdir + os.path.sep + 'poisres_{:.2f}'.format(curprop), poisres)
+        np.save(newlogdir + os.path.sep + 'poisresy_{:.2f}'.format(curprop), np.array(poisresy).reshape(-1, ))
 
         break
 
