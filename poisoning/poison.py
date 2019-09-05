@@ -277,7 +277,8 @@ def alfatilt(x, y, count, poiser):
     poisinds = []
     for i in range(count):
         a = np.random.uniform(low=0, high=totalprob)
-        poisinds.append(bisect.bisect_left(allprobs, a))
+        curind = bisect.bisect_left(allprobs, a)
+        poisinds.append(curind)
         if truepreds[curind] < 0.5:
             allpoisy.append(1)
         else:
