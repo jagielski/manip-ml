@@ -95,9 +95,11 @@ def read_dataset_file(f):
 def open_logging_files(logdir, modeltype, logind, args):
     myname = str(modeltype) + str(logind)
     logdir = logdir + os.path.sep + myname
+    log_dir_for_npy = logdir
+    logdir = logdir + os.path.sep + 'results'
     if not os.path.exists(logdir):
         os.makedirs(logdir)
-    with open(os.path.join(logdir, 'cmd'), 'w') as cmdfile:
+    with open(os.path.join(logdir, 'cmd.txt'), 'w') as cmdfile:
         cmdfile.write(' '.join(['python3'] + argv))
         cmdfile.write('\n')
         for arg in args.__dict__:
@@ -108,7 +110,7 @@ def open_logging_files(logdir, modeltype, logind, args):
     validfile = open(logdir + os.path.sep + "valid.txt", 'w')
     resfile = open(logdir + os.path.sep + "err.txt", 'w')
     resfile.write('poisct,itnum,obj_diff,obj_val,val_mse,test_mse,time\n')
-    return trainfile, testfile, validfile, resfile, logdir
+    return trainfile, testfile, validfile, resfile, log_dir_for_npy
 
 
 # ------------------------------------------------------------------------------- 
@@ -552,15 +554,15 @@ def main(args):
 
     print()
     print("Unpoisoned")
-    print("Validation MSE:", errgrd[0])
-    print("Test MSE:", errgrd[1])
+    print("Validation MSE,", errgrd[0])
+    print("Test MSE,", errgrd[1])
     print('Poisoned:')
-    print("Validation MSE:", err[0])
-    print("Test MSE:", err[1])
+    print("Validation MSE,", err[0])
+    print("Test MSE,", err[1])
     if args.rounding:
         print("Rounded")
-        print("Validation MSE", rounderr[0])
-        print("Test MSE:", rounderr[1])
+        print("Validation MSE,", rounderr[0])
+        print("Test MSE,", rounderr[1])
 
 
 if __name__ == '__main__':
