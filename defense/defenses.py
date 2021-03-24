@@ -29,7 +29,7 @@ def trimclf(x,y,count,lam,model):
     length = x.shape[0]
     width = x.shape[1]
     y = np.array(y)
-    inds = sorted(np.random.permutation(length))[:count]
+    inds = sorted(np.random.permutation(length))
     initinds = inds[:]
     clf = None
 
